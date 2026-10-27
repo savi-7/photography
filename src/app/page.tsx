@@ -1,22 +1,11 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useEffect, useRef, useState, useCallback } from 'react';
 import gsap from 'gsap';
 import Lenis from 'lenis';
 import Cursor from '@/components/Cursor';
-
-// ─── Animation timing (real-time, no timeScale) ────────────────────────────
-
-// ─── Seeded PRNG (mulberry32) ────────────────────────────────────────────────
-function mulberry32(seed: number) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import Gallery, { SCROLL_PHOTOS } from '@/components/Gallery';
+import Lightbox, { LightboxPhoto } from '@/components/Lightbox';
 
 // ─── Pile offsets ────────────────────────────────────────────────────────────
 const PILE_OFFSETS = [
@@ -26,124 +15,21 @@ const PILE_OFFSETS = [
 ];
 
 // ─── BURST PHOTOS ────────────────────────────────────────────────────────────
-// 11 photos whose FINAL positions (after burst) live in the first viewport.
-// cx/cy are fractions of vw/vh respectively (viewport-relative, since burst
-// photos use position:fixed throughout the intro, then switch to absolute).
-// The title sits at ~50% from viewport top, so inner columns leave a gap
-// at 42–58vh. Edge columns (5%, 94%) may span freely.
-const BURST_PHOTOS = [
-  { src: '/assets/moody green.jpg',        aspect: 4/3,  cx: 0.05, cy: 0.07, w: 0.10 },
-  { src: '/assets/aesthetic.jpg',          aspect: 3/4,  cx: 0.27, cy: 0.20, w: 0.12 },
-  { src: '/assets/travel (1).jpg',         aspect: 2/3,  cx: 0.73, cy: 0.38, w: 0.12 },
-  { src: '/assets/download (10).jpg',      aspect: 4/3,  cx: 0.94, cy: 0.17, w: 0.14 },
-  { src: '/assets/download (2).jpg',       aspect: 2/3,  cx: 0.27, cy: 0.73, w: 0.12 },
-  { src: '/assets/cafe.jpg',               aspect: 4/3,  cx: 0.73, cy: 0.72, w: 0.19 },
-  { src: '/assets/architecture.jpg',       aspect: 4/3,  cx: 0.05, cy: 0.70, w: 0.10 },
-  { src: '/assets/travel.jpg',             aspect: 2/3,  cx: 0.50, cy: 0.82, w: 0.12 },
-  { src: '/assets/Beach.jpg',              aspect: 4/3,  cx: 0.86, cy: 0.08, w: 0.10 },
-  { src: '/assets/friends.jpg',            aspect: 2/3,  cx: 0.50, cy: 0.18, w: 0.12 },
-  { src: '/assets/travel_train_travel.jpg',aspect: 4/3,  cx: 0.05, cy: 0.92, w: 0.14 },
+// 11 photos whose positions live inside the first viewport.
+// Coordinates are carefully bounded so no photo clips offscreen boundaries.
+const BURST_PHOTOS: (LightboxPhoto & { cx: number; cy: number; w: number; aspect: number })[] = [
+  { src: '/assets/moody green.jpg',         aspect: 4/3, cx: 0.08, cy: 0.14, w: 0.11, title: 'Moody Canopy' },
+  { src: '/assets/aesthetic.jpg',           aspect: 3/4, cx: 0.28, cy: 0.22, w: 0.12, title: 'Pocket Wildflowers' },
+  { src: '/assets/travel (1).jpg',          aspect: 2/3, cx: 0.73, cy: 0.36, w: 0.12, title: 'Misty Trail' },
+  { src: '/assets/download (10).jpg',       aspect: 4/3, cx: 0.90, cy: 0.18, w: 0.12, title: 'Coastal Plain' },
+  { src: '/assets/download (2).jpg',        aspect: 2/3, cx: 0.27, cy: 0.72, w: 0.12, title: 'Sunlit Sunroof' },
+  { src: '/assets/cafe.jpg',                aspect: 4/3, cx: 0.73, cy: 0.68, w: 0.17, title: 'Quiet Conservatory' },
+  { src: '/assets/architecture.jpg',        aspect: 4/3, cx: 0.08, cy: 0.62, w: 0.10, title: 'Bougainvillea Villa' },
+  { src: '/assets/travel.jpg',              aspect: 2/3, cx: 0.50, cy: 0.76, w: 0.11, title: 'Highland Meadow' },
+  { src: '/assets/Beach.jpg',               aspect: 4/3, cx: 0.85, cy: 0.10, w: 0.09, title: 'Coastal Dusk' },
+  { src: '/assets/friends.jpg',             aspect: 2/3, cx: 0.50, cy: 0.20, w: 0.11, title: 'Circle of Friends' },
+  { src: '/assets/travel_train_travel.jpg', aspect: 4/3, cx: 0.08, cy: 0.86, w: 0.12, title: 'Train Threshold' },
 ];
-
-// ─── SCROLL PHOTOS ───────────────────────────────────────────────────────────
-const SCROLL_PHOTOS = [
-  { src: '/assets/849632285995035493.jpg',     aspect: 4/5   },
-  { src: '/assets/Beach cafe (1).jpg',         aspect: 4/3   },
-  { src: '/assets/Beach cafe (2).jpg',         aspect: 4/3   },
-  { src: '/assets/Beach cafe.jpg',             aspect: 4/3   },
-  { src: '/assets/aesthetic.webp',             aspect: 3/4   },
-  { src: '/assets/beach side.jpg',             aspect: 4/3   },
-  { src: '/assets/cafe aesthetic (1).jpg',     aspect: 4/3   },
-  { src: '/assets/cafe aesthetic.jpg',         aspect: 4/3   },
-  { src: '/assets/download (1).jpg',           aspect: 2/3   },
-  { src: '/assets/download (11).jpg',          aspect: 2/3   },
-  { src: '/assets/download (12).jpg',          aspect: 2/3   },
-  { src: '/assets/download (13).jpg',          aspect: 4/3   },
-  { src: '/assets/download (14).jpg',          aspect: 4/3   },
-  { src: '/assets/download (15).jpg',          aspect: 2/3   },
-  { src: '/assets/download (16).jpg',          aspect: 4/3   },
-  { src: '/assets/download (17).jpg',          aspect: 2/3   },
-  { src: '/assets/download (18).jpg',          aspect: 4/3   },
-  { src: '/assets/download (19).jpg',          aspect: 4/3   },
-  { src: '/assets/download (20).jpg',          aspect: 4/3   },
-  { src: '/assets/download (21).jpg',          aspect: 2/3   },
-  { src: '/assets/download (22).jpg',          aspect: 4/3   },
-  { src: '/assets/download (23).jpg',          aspect: 4/3   },
-  { src: '/assets/download (3).jpg',           aspect: 1/1   },
-  { src: '/assets/download (4).jpg',           aspect: 4/3   },
-  { src: '/assets/download (5).jpg',           aspect: 1/1   },
-  { src: '/assets/download (6).jpg',           aspect: 2/3   },
-  { src: '/assets/download (7).jpg',           aspect: 4/3   },
-  { src: '/assets/download (8).jpg',           aspect: 4/3   },
-  { src: '/assets/download (9).jpg',           aspect: 4/3   },
-  { src: '/assets/late night 💤.jpg',          aspect: 2/3   },
-  { src: '/assets/minimalist design.jpg',      aspect: 4/3   },
-  { src: '/assets/moody sky aesthetic.webp',   aspect: 2/3   },
-  { src: '/assets/moody.jpg',                  aspect: 2/3   },
-  { src: '/assets/phone wallpaper.webp',       aspect: 9/16  },
-  { src: '/assets/soft sky aesthetic.webp',    aspect: 2/3   },
-  { src: '/assets/wave 🌊 Beach.jpg',          aspect: 4/3   },
-  { src: '/assets/\u201cMinimal Vintage Cafe Aesthetic _ Retro Vibes\u201d.jpg',               aspect: 4/3 },
-  { src: '/assets/\u201cMinimalist Scandinavian Dining Aesthetic _ Clean Modern Design\u201d.jpg', aspect: 4/3 },
-  // ── New photos ──────────────────────────────────────────────────────────────
-  { src: '/assets/#satinpothos #plantlife #scindapsuspictus….jpg', aspect: 2/3   }, // plant vine, portrait
-  { src: '/assets/1148488342519024589.jpg',    aspect: 2/3   }, // vintage green car, portrait
-  { src: '/assets/1980 P150X Vespa.jpg',       aspect: 2/3   }, // black & white Vespa, portrait
-  { src: '/assets/359584351524915951.jpg',     aspect: 2/3   }, // banana leaf & sky, portrait
-  { src: '/assets/381046818490992166.jpg',     aspect: 2/3   }, // Range Rover + olive tree, portrait
-  { src: '/assets/683421312236182778.jpg',     aspect: 3/4   }, // fiddle-leaf fig & sky
-  { src: '/assets/742953269785267056.jpg',     aspect: 2/3   }, // moody tropical leaves, portrait
-  { src: '/assets/850195235952401620.jpg',     aspect: 2/3   }, // pink bougainvillea & sky, portrait
-  { src: '/assets/880383427182110633.jpg',     aspect: 3/4   }, // golden ocean waves
-  { src: '/assets/922112092481155761.jpg',     aspect: 3/4   }, // birds on wire with green box
-  { src: '/assets/940478334714045364.jpg',     aspect: 3/4   }, // cat + red flowers collage
-  { src: '/assets/990299406197230256.jpg',     aspect: 2/3   }, // orange cat close-up, portrait
-  { src: '/assets/Flower.jpg',                 aspect: 2/3   }, // yellow wildflowers, portrait
-  { src: '/assets/konkan diaries.jpg',         aspect: 2/3   }, // palm trees looking up, portrait
-  { src: '/assets/_).jpg',                     aspect: 2/3   }, // dramatic clouds composite, portrait
-  { src: '/assets/✨.jpg',                     aspect: 3/4   }, // minimal cafe arched booth
-  { src: '/assets/The best rustic style decoration ideas from Greek hotels -The Hotel Trotter.jpg', aspect: 3/4 }, // Greek hotel archway
-];
-
-// ─── Scroll layout (pure, seeded, module scope) ───────────────────────────────
-const COL_X       = [0.05, 0.27, 0.50, 0.73, 0.94];
-const COL_Y0      = [0, 25, 12, 38, 50];
-const SPACING_VH  = 50;
-const JITTER_V    = 4;
-const JITTER_H    = 1.5;
-const SCROLL_START_VH = 105;  // scroll photos start just below first viewport
-const TRAIL_VH    = 40;
-
-interface ScrollPhoto { src: string; aspect: number; cxFrac: number; cyVH: number; widthFrac: number; }
-
-function buildScrollLayout(): ScrollPhoto[] {
-  const rng = mulberry32(42);
-  const columns: number[][] = [[], [], [], [], []];
-  SCROLL_PHOTOS.forEach((_, i) => columns[i % 5].push(i));
-  const placed: ScrollPhoto[] = [];
-  columns.forEach((colPhotos, col) => {
-    colPhotos.forEach((photoIdx, row) => {
-      const ph = SCROLL_PHOTOS[photoIdx];
-      const jV = (rng() * 2 - 1) * JITTER_V;
-      const jH = (rng() * 2 - 1) * (JITTER_H / 100);
-      const isEdge = col === 0 || col === 4;
-      let widthFrac: number;
-      if (ph.aspect >= 1.2)       widthFrac = isEdge ? 0.10 : 0.19;
-      else if (ph.aspect <= 0.7)  widthFrac = isEdge ? 0.08 : 0.12;
-      else                        widthFrac = isEdge ? 0.07 : 0.10;
-      placed.push({ src: ph.src, aspect: ph.aspect,
-        cxFrac: COL_X[col] + jH,
-        cyVH:   SCROLL_START_VH + COL_Y0[col] + row * SPACING_VH + jV,
-        widthFrac });
-    });
-  });
-  return placed;
-}
-
-const SCROLL_LAYOUT = buildScrollLayout();
-const TOTAL_VH = Math.max(...SCROLL_LAYOUT.map((p) => p.cyVH)) + SPACING_VH / 2 + TRAIL_VH;
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -152,18 +38,40 @@ export default function Home() {
   const titleRef      = useRef<HTMLDivElement>(null);
   const navRef        = useRef<HTMLElement>(null);
   const scrollHintRef = useRef<HTMLDivElement>(null);
-  const [introComplete, setIntroComplete] = useState(false);
-  const hasRunRef = useRef(false);  // one-shot guard; resets in cleanup so remount re-runs
+  const lenisRef      = useRef<Lenis | null>(null);
 
+  const [introComplete, setIntroComplete] = useState(false);
+  const hasRunRef = useRef(false);
+
+  // Lightbox State
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const [lightboxList, setLightboxList] = useState<LightboxPhoto[]>(SCROLL_PHOTOS);
+
+  const openScrollLightbox = useCallback((index: number) => {
+    setLightboxList(SCROLL_PHOTOS);
+    setActivePhotoIdx(index);
+    setLightboxOpen(true);
+  }, []);
+
+  const openBurstLightbox = useCallback((index: number) => {
+    setLightboxList(BURST_PHOTOS);
+    setActivePhotoIdx(index);
+    setLightboxOpen(true);
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxOpen(false);
+  }, []);
+
+  // ── GSAP Intro Animation ───────────────────────────────────────────────────
   useLayoutEffect(() => {
-    // Force scroll to top — browser may restore scroll position on refresh
     window.scrollTo(0, 0);
 
-    // One-shot guard: prevents double-run but resets so a real remount re-runs
     if (hasRunRef.current) return;
     hasRunRef.current = true;
 
-    // Lock scroll immediately
+    // Lock scroll immediately during intro
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
 
@@ -172,18 +80,16 @@ export default function Home() {
     const cx = vw / 2;
     const cy = vh / 2;
 
-    // ── Compute burst photo grid positions in VIEWPORT px ─────────────────────
-    // (burst photos stay position:fixed throughout intro → viewport coords)
     type GridPos = { widthPx: number; heightPx: number; topPx: number; leftPx: number };
     const gridPos: GridPos[] = BURST_PHOTOS.map((bp) => {
-      const widthPx  = bp.w  * vw;
+      const widthPx  = bp.w * vw;
       const heightPx = widthPx / bp.aspect;
-      const leftPx   = bp.cx * vw - widthPx / 2;
-      const topPx    = bp.cy * vh - heightPx / 2;
+      const leftPx   = Math.max(12, Math.min(vw - widthPx - 12, bp.cx * vw - widthPx / 2));
+      const topPx    = Math.max(12, Math.min(vh - heightPx - 12, bp.cy * vh - heightPx / 2));
       return { widthPx, heightPx, leftPx, topPx };
     });
 
-    // ── Place burst photos at PILE centre (fixed, invisible) ──────────────────
+    // Place burst photos at PILE centre
     BURST_PHOTOS.forEach((_, i) => {
       const el  = burstRefs.current[i];
       if (!el) return;
@@ -198,7 +104,7 @@ export default function Home() {
         width:      gp.widthPx,
         height:     gp.heightPx,
         opacity:    0,
-        visibility: 'visible',   // unhide now that GSAP controls geometry
+        visibility: 'visible',
         filter:     'blur(0px)',
         zIndex:     500 + i,
         willChange: 'transform, opacity, filter',
@@ -208,11 +114,9 @@ export default function Home() {
     if (plusRef.current)  gsap.set(plusRef.current,  { visibility: 'visible', scale: 0, transformOrigin: 'center center' });
     if (titleRef.current) gsap.set(titleRef.current, { opacity: 0, filter: 'blur(16px)' });
 
-    // ── Master timeline ───────────────────────────────────────────────────────
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         onComplete: () => {
-          // Switch burst photos from fixed → absolute (scroll=0 so coords match)
           const scrollY = window.scrollY;
           BURST_PHOTOS.forEach((_, i) => {
             const el = burstRefs.current[i];
@@ -223,7 +127,7 @@ export default function Home() {
               top:        0,
               left:       0,
               x:          gp.leftPx,
-              y:          gp.topPx + scrollY,   // adjust if somehow scrolled
+              y:          gp.topPx + scrollY,
               width:      gp.widthPx,
               height:     gp.heightPx,
               zIndex:     2,
@@ -231,13 +135,14 @@ export default function Home() {
               clearProps: 'filter',
             });
           });
+
           // Unlock scroll
           document.documentElement.style.overflow = '';
           document.body.style.overflow = '';
           setIntroComplete(true);
         },
       });
-      // ── PILE: 0.4 s → 1.5 s ──────────────────────────────────────────────────
+
       // Photo 1 — blur-in, 0.45s
       tl.fromTo(burstRefs.current[0],
         { opacity: 0.35, filter: 'blur(12px)' },
@@ -253,23 +158,24 @@ export default function Home() {
         { opacity: 0.35, filter: 'blur(12px)' },
         { opacity: 1,    filter: 'blur(0px)', duration: 0.30, ease: 'power2.out' },
         0.75);
+
       // Photos 4–6 — instant cuts, 0.15s apart
       tl.to(burstRefs.current[3], { opacity: 1, duration: 0, ease: 'none' }, 0.85);
       tl.to(burstRefs.current[4], { opacity: 1, duration: 0, ease: 'none' }, 1.00);
       tl.to(burstRefs.current[5], { opacity: 1, duration: 0, ease: 'none' }, 1.15);
-      // Photo 7 — instant cut, slightly longer hold (~0.20s before remaining appear)
+
+      // Photo 7 — instant cut
       tl.to(burstRefs.current[6], { opacity: 1, duration: 0, ease: 'none' }, 1.30);
-      // At 1.5s: remaining photos (indices 7-10) appear instantly in one step
+
+      // At 1.5s: remaining photos appear instantly
       const remainingEls = burstRefs.current.slice(7).filter(Boolean) as HTMLDivElement[];
       tl.to(remainingEls, { opacity: 1, duration: 0, ease: 'none' }, 1.50);
 
-      // ── PLUS: 1.5 s ───────────────────────────────────────────────────────
+      // Crosshair
       if (plusRef.current)
-        tl.to(plusRef.current,
-          { scale: 1, duration: 0.25, ease: 'power2.out' },
-          1.5);
+        tl.to(plusRef.current, { scale: 1, duration: 0.25, ease: 'power2.out' }, 1.5);
 
-      // ── BURST: 1.6 s — single tween with stagger ─────────────────────────
+      // Burst to destination positions
       const burstEls  = burstRefs.current.filter(Boolean) as HTMLDivElement[];
       const burstDest = burstEls.map((_, i) => ({ x: gridPos[i].leftPx, y: gridPos[i].topPx }));
       tl.to(burstEls, {
@@ -280,7 +186,7 @@ export default function Home() {
         stagger: { each: 0.02, from: 'start' },
       }, 1.6);
 
-      // ── TITLE: 2.1 s ──────────────────────────────────────────────────────
+      // Title reveal
       if (titleRef.current)
         tl.fromTo(titleRef.current,
           { opacity: 0, filter: 'blur(16px)' },
@@ -291,284 +197,352 @@ export default function Home() {
 
     return () => {
       ctx.revert();
-      hasRunRef.current = false;             // allow re-run on next real mount
+      hasRunRef.current = false;
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Lenis + scroll-driven UI ─────────────────────────────────────────────────
-  useLayoutEffect(() => {
+  // ── Original Lenis Smooth Scroll ───────────────────────────────────────────
+  useEffect(() => {
     if (!introComplete) return;
-    const lenis = new Lenis({ lerp: 0.08, wheelMultiplier: 1, touchMultiplier: 1 });
-    let rafId: number;
-    const raf = (t: number) => { lenis.raf(t); rafId = requestAnimationFrame(raf); };
-    rafId = requestAnimationFrame(raf);
 
-    // Show scroll-hint briefly then hide
+    // Show scroll-hint briefly then gently hide
     const hint = scrollHintRef.current;
     if (hint) {
       hint.classList.add('visible');
-      setTimeout(() => { hint.style.opacity = '0'; }, 4000);
+      const timer = setTimeout(() => { hint.style.opacity = '0'; }, 3500);
+      return () => clearTimeout(timer);
     }
-
-    // Nav appears after scrolling past first screen; title + plus fade out
-    lenis.on('scroll', ({ scroll }: { scroll: number }) => {
-      const nav   = navRef.current;
-      const title = titleRef.current;
-      const plus  = plusRef.current;
-      const vh    = window.innerHeight;
-
-      // Nav in/out
-      if (nav) {
-        if (scroll > 80) nav.classList.add('nav--visible');
-        else              nav.classList.remove('nav--visible');
-      }
-
-      // Title + plus fade out between 0.3vh and 0.7vh scroll
-      const fadeStart = vh * 0.3;
-      const fadeEnd   = vh * 0.7;
-      const progress  = Math.max(0, Math.min(1, (scroll - fadeStart) / (fadeEnd - fadeStart)));
-      if (title) title.style.opacity = String(1 - progress);
-      if (plus)  plus.style.opacity  = String(1 - progress);
-    });
-
-    return () => { cancelAnimationFrame(rafId); lenis.destroy(); };
   }, [introComplete]);
 
-  // ── Scroll-reveal (IntersectionObserver) ──────────────────────────────────────
   useEffect(() => {
     if (!introComplete) return;
-    // Photos start slightly below with opacity 0; observer fades them in as they enter
-    const timer = setTimeout(() => {
-      const els = document.querySelectorAll<HTMLElement>('.photo-wrap');
-      // Set initial state for reveal
-      els.forEach(el => {
-        if (el.style.opacity === '0') {
-          gsap.set(el, { opacity: 0, y: 20 });
-        }
-      });
-      const obs = new IntersectionObserver(
-        (entries) => entries.forEach(e => {
-          if (e.isIntersecting) {
-            gsap.to(e.target, { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out' });
-            obs.unobserve(e.target);
+
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      touchMultiplier: 1.5,
+    });
+    lenisRef.current = lenis;
+
+    let rafId: number;
+    function raf(time: number) {
+      lenis.raf(time);
+      rafId = requestAnimationFrame(raf);
+    }
+    rafId = requestAnimationFrame(raf);
+
+    // Scroll listener for nav reveal and title / plus fade
+    const onScroll = () => {
+      const scroll = window.scrollY;
+      const nav    = navRef.current;
+      const title  = titleRef.current;
+      const plus   = plusRef.current;
+      const vh     = window.innerHeight;
+
+      if (nav) {
+        if (scroll > 60) nav.classList.add('nav--visible');
+        else             nav.classList.remove('nav--visible');
+      }
+
+      // Plus crosshair fades out on initial scroll
+      const fadeStart = vh * 0.15;
+      const fadeEnd   = vh * 0.45;
+      const progress  = Math.max(0, Math.min(1, (scroll - fadeStart) / (fadeEnd - fadeStart)));
+      if (plus) plus.style.opacity = String(1 - progress);
+
+      // Hero name stays visible throughout gallery scroll, only fading out when arriving at the About section
+      if (title) {
+        const aboutEl = document.getElementById('about');
+        if (aboutEl) {
+          const rect = aboutEl.getBoundingClientRect();
+          if (rect.top < vh) {
+            const aboutFade = Math.max(0, Math.min(1, (vh - rect.top) / (vh * 0.4)));
+            title.style.opacity = String(1 - aboutFade);
+          } else {
+            title.style.opacity = '1';
           }
-        }),
-        { rootMargin: '80px 0px 0px 0px', threshold: 0.01 }
-      );
-      els.forEach(el => obs.observe(el));
-    }, 100);
-    return () => clearTimeout(timer);
+        } else {
+          title.style.opacity = '1';
+        }
+      }
+    };
+
+    lenis.on('scroll', onScroll);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      lenis.destroy();
+      lenisRef.current = null;
+    };
   }, [introComplete]);
+
+  // Smooth scroll handler for nav & footer links
+  const scrollToTarget = useCallback((target: string | number) => {
+    if (lenisRef.current) {
+      lenisRef.current.scrollTo(target, { duration: 1.2 });
+    } else {
+      if (typeof target === 'number') {
+        window.scrollTo({ top: target, behavior: 'smooth' });
+      } else {
+        const el = document.querySelector(target);
+        el?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, []);
 
   return (
     <>
       {/* ── Custom cursor ─────────────────────────────────────── */}
       <Cursor />
 
-      {/* ── Navigation ────────────────────────────────────────── */}
-      <nav ref={navRef} className="nav">
-        <div className="nav__logo">Savio Joseph</div>
-        <div className="nav__links">
-          <a href="#gallery" className="nav__link">Work</a>
-          <a href="#about"   className="nav__link">About</a>
-          <a href="mailto:saviojoseph@email.com" className="nav__link">Contact</a>
-        </div>
-      </nav>
+      {/* ── Editorial Lightbox ─────────────────────────────────── */}
+      <Lightbox
+        isOpen={lightboxOpen}
+        currentIndex={activePhotoIdx}
+        photos={lightboxList}
+        onClose={closeLightbox}
+        onSelectIndex={(nextIdx) => setActivePhotoIdx(nextIdx)}
+        onNavigate={(nextIdx) => setActivePhotoIdx(nextIdx)}
+      />
 
-      {/* ── Scroll hint ───────────────────────────────────────── */}
-      <div ref={scrollHintRef} className="scroll-hint">
+      {/* ── Navigation bar ────────────────────────────────────── */}
+      <header>
+        <nav ref={navRef} className="nav" aria-label="Main Navigation">
+          <button
+            type="button"
+            className="nav__logo"
+            onClick={() => scrollToTarget(0)}
+            aria-label="Savio Joseph Home"
+          >
+            Svj
+          </button>
+          <div className="nav__links">
+            <button
+              type="button"
+              className="nav__link"
+              onClick={() => scrollToTarget('#gallery')}
+            >
+              Work
+            </button>
+            <button
+              type="button"
+              className="nav__link"
+              onClick={() => scrollToTarget('#about')}
+            >
+              About
+            </button>
+            <a href="mailto:saviojoseph@email.com" className="nav__link">Contact</a>
+          </div>
+        </nav>
+      </header>
+
+      {/* ── Scroll hint indicator ─────────────────────────────── */}
+      <div ref={scrollHintRef} className="scroll-hint" aria-hidden="true">
         <div className="scroll-hint__line" />
         <span className="scroll-hint__text">Scroll</span>
       </div>
 
-    <div ref={containerRef} style={{ position: 'relative' }}>
+      <div ref={containerRef} style={{ position: 'relative' }}>
 
-      {/* ── Fixed "+" crosshair ───────────────────────────────── */}
-      <div
-        ref={plusRef}
-        aria-hidden="true"
-        style={{
-          position:   'fixed',
-          top:        '3.5vh',
-          left:       'calc(50% - 12px)',
-          zIndex:     1000,
-          width:      '24px',
-          height:     '24px',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          visibility: 'hidden',
-        }}
-      >
-        <span style={{ position:'absolute', top:'50%', left:0, right:0, height:'1px', background:'var(--ink)', transform:'translateY(-50%)', display:'block', opacity:0.5 }} />
-        <span style={{ position:'absolute', left:'50%', top:0, bottom:0, width:'1px', background:'var(--ink)', transform:'translateX(-50%)', display:'block', opacity:0.5 }} />
-      </div>
+        {/* ── Fixed "+" crosshair ───────────────────────────────── */}
+        <div
+          ref={plusRef}
+          aria-hidden="true"
+          className="plus-crosshair"
+          style={{
+            position:   'fixed',
+            top:        '3.5vh',
+            left:       'calc(50% - 12px)',
+            zIndex:     1000,
+            width:      '24px',
+            height:     '24px',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            visibility: 'hidden',
+          }}
+        >
+          <span style={{ position:'absolute', top:'50%', left:0, right:0, height:'1px', background:'var(--ink)', transform:'translateY(-50%)', display:'block', opacity:0.5 }} />
+          <span style={{ position:'absolute', left:'50%', top:0, bottom:0, width:'1px', background:'var(--ink)', transform:'translateX(-50%)', display:'block', opacity:0.5 }} />
+        </div>
 
-      {/* ── Fixed title — editorial redesign ─────────────────── */}
-      <div
-        ref={titleRef}
-        style={{
-          position: 'fixed', top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%)',
-          opacity: 0,
-          zIndex: 1,
-          textAlign: 'center',
-          userSelect: 'none', pointerEvents: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {/* Italic display name */}
-        <div style={{
-          fontFamily: 'var(--font-playfair)',
-          fontSize:   'clamp(2.8rem, 5.5vw, 5rem)',
-          fontWeight: 400,
-          fontStyle:  'italic',
-          letterSpacing: '-0.02em',
-          lineHeight: 1,
-          color: 'var(--ink)',
-        }}>Savio Joseph</div>
-        {/* Label below */}
-        <div style={{
-          marginTop: '0.6rem',
-          fontFamily: 'var(--font-dm)',
-          fontSize:   '0.6rem',
-          fontWeight: 500,
-          letterSpacing: '0.28em',
-          textTransform: 'uppercase',
-          color: 'var(--dust)',
-        }}>Photography</div>
-      </div>
+        {/* ── Fixed Hero Title ─────────────────────────────────── */}
+        <div
+          ref={titleRef}
+          className="hero-title"
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            opacity: 0,
+            zIndex: 1,
+            textAlign: 'center',
+            userSelect: 'none',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <h1 style={{
+            fontFamily: 'var(--font-norman)',
+            fontVariationSettings: "'wght' 400",
+            fontSize:   'clamp(3.2rem, 7.8vw, 7.2rem)',
+            fontWeight: 400,
+            letterSpacing: '-0.02em',
+            lineHeight: 0.95,
+            color: 'var(--ink)',
+            margin: 0,
+          }}>
+            Savio Joseph
+          </h1>
+        </div>
 
-      {/* Scrollable page ───────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', width: '100%', height: `${TOTAL_VH}vh` }}>
-
-        {/* Burst photos: GSAP owns all geometry; visibility:hidden prevents flash */}
-        {BURST_PHOTOS.map((bp, i) => (
-          <div
-            key={`burst-${i}`}
-            ref={(el) => { burstRefs.current[i] = el; }}
-            style={{
-              position:   'fixed',
-              top:        0,
-              left:       0,
-              overflow:   'hidden',
-              zIndex:     500 + i,
-              visibility: 'hidden',  // GSAP will set opacity + visibility
-              opacity:    0,
-              width:      0,
-              height:     0,
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={bp.src} alt="" style={{
-              width: '100%', height: '100%', objectFit: 'cover',
-              display: 'block', pointerEvents: 'none', userSelect: 'none',
-            }} />
-          </div>
-        ))}
-
-        {/* ── Scroll gallery photos ─────────────────────────────── */}
-        {SCROLL_LAYOUT.map((item, i) => {
-          const widthPct = item.widthFrac * 100;
-          const leftPct  = item.cxFrac * 100 - widthPct / 2;
-          return (
+        {/* ── Hero Burst Photos ────────────────────────────────── */}
+        <div style={{ position: 'relative', width: '100%', height: '100vh', zIndex: 2 }}>
+          {BURST_PHOTOS.map((bp, i) => (
             <div
-              key={`scroll-${i}`}
+              key={`burst-${i}`}
+              ref={(el) => { burstRefs.current[i] = el; }}
               className="photo-wrap"
+              onClick={() => openBurstLightbox(i)}
+              title={bp.title}
               style={{
-                position:    'absolute',
-                top:         `${item.cyVH}vh`,
-                left:        `${leftPct}vw`,
-                width:       `${widthPct}vw`,
-                aspectRatio: String(item.aspect),
-                zIndex:      2,
-                transform:   'translateY(-50%)',
-                opacity:     0,   // revealed by IntersectionObserver + GSAP
+                position:   'fixed',
+                top:        0,
+                left:       0,
+                overflow:   'hidden',
+                zIndex:     500 + i,
+                visibility: 'hidden',
+                opacity:    0,
+                width:      0,
+                height:     0,
+                cursor:     'pointer',
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', pointerEvents:'none', userSelect:'none' }} />
+              <img
+                src={bp.src}
+                alt={bp.title ?? 'Photograph'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                }}
+              />
+              <div className="photo-tag">
+                <span>{bp.title}</span>
+              </div>
             </div>
-          );
-        })}
-
-      </div>{/* end gallery container */}
-
-      {/* ══════════════════════════════════════════════════════
-           ABOUT SECTION
-         ══════════════════════════════════════════════════════ */}
-      <section id="about" className="about">
-        {/* Left — editorial quote */}
-        <div>
-          <p className="t-label" style={{ marginBottom: '2rem' }}>About the Photographer</p>
-          <h2 className="about__quote reveal">
-            Light is the<br />
-            <em>language</em> I speak<br />
-            most fluently.
-          </h2>
+          ))}
         </div>
 
-        {/* Right — bio */}
-        <div className="about__text">
-          <p className="t-label">Savio Joseph · Kerala, India</p>
-          <p className="about__body">
-            I am an aesthetic, minimalistic photographer drawn to the quiet moments
-            between things — the way sunlight falls through a window, the stillness
-            of a cafe in the early morning, the texture of leaves against open sky.
-          </p>
-          <p className="about__body">
-            My work is an invitation to slow down, to look closer, and to find
-            beauty in the ordinary. Every frame is intentional; every shadow, deliberate.
-          </p>
-          {/* Stats row */}
-          <div style={{ display:'flex', gap:'3rem', marginTop:'1rem', paddingTop:'2rem', borderTop:'1px solid rgba(13,13,13,0.08)' }}>
-            {[['5+','Years'], ['200+','Images'], ['∞','Stories']].map(([n, l]) => (
-              <div key={l}>
-                <div style={{ fontFamily:'var(--font-playfair)', fontSize:'1.8rem', fontStyle:'italic', color:'var(--ink)', lineHeight:1 }}>{n}</div>
-                <div className="t-label" style={{ marginTop:'0.3rem' }}>{l}</div>
+        {/* ── Scroll gallery with smooth IntersectionObserver reveal ─ */}
+        <Gallery introComplete={introComplete} onSelectPhoto={openScrollLightbox} />
+
+        {/* ══════════════════════════════════════════════════════
+             ABOUT SECTION
+           ══════════════════════════════════════════════════════ */}
+        <section id="about" className="about">
+          <div>
+            <p className="t-label" style={{ marginBottom: '2rem' }}>About the Photographer</p>
+            <h2 className="about__quote">
+              Light is the<br />
+              <em>language</em> I speak<br />
+              most fluently.
+            </h2>
+          </div>
+
+          <div className="about__text">
+            <p className="t-label">Savio Joseph · Kerala, India</p>
+            <p className="about__body">
+              I am an aesthetic, minimalistic photographer drawn to the quiet moments
+              between things — the way sunlight falls through a window, the stillness
+              of a cafe in the early morning, the texture of leaves against open sky.
+            </p>
+            <p className="about__body">
+              My work is an invitation to slow down, to look closer, and to find
+              beauty in the ordinary. Every frame is intentional; every shadow, deliberate.
+            </p>
+
+            {/* Stats row */}
+            <div className="about__stats">
+              {[['5+','Years'], ['200+','Images'], ['∞','Stories']].map(([n, l]) => (
+                <div key={l}>
+                  <div className="about__stat-num">{n}</div>
+                  <div className="t-label" style={{ marginTop:'0.3rem' }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════════════════════
+             MARQUEE
+           ══════════════════════════════════════════════════════ */}
+        <div className="marquee-wrap" aria-hidden="true">
+          <div className="marquee-track">
+            {[...Array(2)].map((_, rep) => (
+              <div key={rep} style={{ display:'flex', gap:'4rem', alignItems:'center' }}>
+                {['Aesthetic','Minimal','Moody','Timeless','Analog','Still Life','Kerala','Nature','Architecture','Cafe Culture'].map((word, wi) => (
+                  <span key={wi} style={{ display:'flex', alignItems:'center', gap:'4rem' }}>
+                    <span className="marquee-item">{word}</span>
+                    <span className="marquee-item marquee-dot">·</span>
+                  </span>
+                ))}
               </div>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* ══════════════════════════════════════════════════════
-           MARQUEE
-         ══════════════════════════════════════════════════════ */}
-      <div className="marquee-wrap">
-        <div className="marquee-track">
-          {/* Double for seamless loop */}
-          {[...Array(2)].map((_, rep) => (
-            <div key={rep} style={{ display:'flex', gap:'4rem', alignItems:'center' }}>
-              {['Aesthetic','Minimal','Moody','Timeless','Analog','Still Life','Kerala','Nature','Architecture','Cafe Culture'].map((word, wi) => (
-                <span key={wi} style={{ display:'flex', alignItems:'center', gap:'4rem' }}>
-                  <span className="marquee-item">{word}</span>
-                  <span className="marquee-item marquee-dot">·</span>
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ══════════════════════════════════════════════════════
-           FOOTER
-         ══════════════════════════════════════════════════════ */}
-      <footer className="footer">
-        <div className="footer__name" aria-hidden="true">Savio Joseph</div>
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'0.5rem' }}>
-          <div className="footer__links">
-            <a href="https://instagram.com" target="_blank" rel="noreferrer" className="footer__link">Instagram</a>
-            <a href="mailto:saviojoseph@email.com" className="footer__link">Email</a>
-            <a href="#gallery" className="footer__link">↑ Back to top</a>
+        {/* ══════════════════════════════════════════════════════
+             FOOTER
+           ══════════════════════════════════════════════════════ */}
+        <footer className="footer">
+          <div
+            className="footer__name"
+            aria-hidden="true"
+            style={{
+              fontFamily: 'var(--font-norman)',
+              fontVariationSettings: "'wght' 400",
+            }}
+          >
+            Savio Joseph
           </div>
-          <p className="footer__copy">© 2024 Savio Joseph · All rights reserved</p>
-        </div>
-      </footer>
+          <div className="footer__right">
+            <div className="footer__links">
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noreferrer"
+                className="footer__link"
+              >
+                Instagram
+              </a>
+              <a
+                href="mailto:saviojoseph@email.com"
+                className="footer__link"
+              >
+                Email
+              </a>
+              <button
+                type="button"
+                onClick={() => scrollToTarget(0)}
+                className="footer__link"
+              >
+                ↑ Back to top
+              </button>
+            </div>
+            <p className="footer__copy">
+              © {new Date().getFullYear()} Savio Joseph · All rights reserved
+            </p>
+          </div>
+        </footer>
 
-    </div>{/* end containerRef */}
+      </div>{/* end containerRef */}
     </>
   );
 }
