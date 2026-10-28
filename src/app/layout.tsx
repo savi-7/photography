@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Playfair_Display, DM_Sans, Bodoni_Moda } from "next/font/google";
 import "./globals.css";
 
@@ -24,6 +24,14 @@ const dmSans = DM_Sans({
   display: "swap",
   variable: "--font-dm",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#F0EDE8",
+};
 
 export const metadata: Metadata = {
   title: "Savio Joseph — Photography",

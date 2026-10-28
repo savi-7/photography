@@ -90,7 +90,7 @@ export default function AboutSection({
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top top',
-          end: () => `+=${window.innerHeight * 6.5}`,
+          end: () => `+=${window.innerHeight * (window.innerWidth < 640 ? 4.5 : 6.5)}`,
           pin: stageRef.current,
           scrub: 0.6,
           anticipatePin: 1,

@@ -8,6 +8,12 @@ export default function Cursor() {
   const ringRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Completely disable custom cursor on touch-first devices (phones, tablets)
+    // to preserve 120Hz native touch scroll performance and eliminate unnecessary RAF cycles
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+      return;
+    }
+
     const dot  = dotRef.current;
     const ring = ringRef.current;
     if (!dot || !ring) return;

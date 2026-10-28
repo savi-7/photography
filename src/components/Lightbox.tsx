@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 
 export interface LightboxPhoto {
   src: string;
@@ -43,6 +43,23 @@ export default function Lightbox({
     navigate((currentIndex + 1) % photos.length);
   }, [currentIndex, photos.length, navigate]);
 
+  const touchStartXRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    touchStartXRef.current = null;
+    if (deltaX > 45) {
+      handlePrev();
+    } else if (deltaX < -45) {
+      handleNext();
+    }
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -67,6 +84,8 @@ export default function Lightbox({
       role="dialog"
       aria-modal="true"
       className="lightbox-overlay"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -134,7 +153,7 @@ export default function Lightbox({
 
       {/* ── Bottom Controls & Hint ── */}
       <div className="lightbox-bottombar">
-        <span className="lightbox-hint">Use arrow keys (← / →) to navigate · ESC to exit</span>
+        <span className="lightbox-hint">Swipe or arrow keys to navigate · Tap outside to exit</span>
       </div>
     </div>
   );

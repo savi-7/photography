@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { LightboxPhoto } from './Lightbox';
 
@@ -112,11 +112,8 @@ export const SCROLL_PHOTOS: LightboxPhoto[] = [
 ];
 
 // ─── Layout constants ────────────────────────────────────────────────────────
-const COL_X           = [0.06, 0.28, 0.50, 0.72, 0.94];
-const COL_Y0          = [4,    20,   8,    24,   12  ];
-const GAP_VH          = 22;    // guaranteed breathing space between photos in same column
-const JITTER_H        = 1.0;
 const SCROLL_START_VH = 8;     // gallery starts right below the hero
+const JITTER_H        = 1.0;
 
 interface PlacedPhoto extends LightboxPhoto {
   index: number;
@@ -126,16 +123,47 @@ interface PlacedPhoto extends LightboxPhoto {
   widthFrac: number;
 }
 
-function buildLayout(): PlacedPhoto[] {
+interface LayoutResult {
+  placed: PlacedPhoto[];
+  totalVH: number;
+}
+
+function buildLayout(numCols: 2 | 3 | 5): LayoutResult {
   const rng = mulberry32(42);
   const placed: PlacedPhoto[] = [];
-  const colBottoms = COL_Y0.map(y0 => SCROLL_START_VH + y0);
+
+  let colX: number[];
+  let colY0: number[];
+  let gapVH: number;
+  let aspectScale: number;
+
+  if (numCols === 2) {
+    // Mobile: 2 balanced columns, generous width for crisp viewing
+    colX = [0.28, 0.72];
+    colY0 = [4, 16];
+    gapVH = 12;
+    aspectScale = 54;
+  } else if (numCols === 3) {
+    // Tablet: 3 balanced columns
+    colX = [0.18, 0.50, 0.82];
+    colY0 = [4, 16, 8];
+    gapVH = 16;
+    aspectScale = 85;
+  } else {
+    // Desktop: 5 balanced columns
+    colX = [0.06, 0.28, 0.50, 0.72, 0.94];
+    colY0 = [4, 20, 8, 24, 12];
+    gapVH = 22;
+    aspectScale = 177;
+  }
+
+  const colBottoms = colY0.map((y0) => SCROLL_START_VH + y0);
 
   SCROLL_PHOTOS.forEach((ph, photoIdx) => {
-    // Pick the column with the minimum bottom height so all 5 columns remain evenly populated
+    // Pick the column with the minimum bottom height so all columns remain evenly populated
     let minCol = 0;
     let minBottom = colBottoms[0];
-    for (let c = 1; c < 5; c++) {
+    for (let c = 1; c < numCols; c++) {
       if (colBottoms[c] < minBottom) {
         minBottom = colBottoms[c];
         minCol = c;
@@ -143,17 +171,31 @@ function buildLayout(): PlacedPhoto[] {
     }
 
     const col = minCol;
-    const isEdge = col === 0 || col === 4;
+    const isEdge = numCols === 5 ? (col === 0 || col === 4) : false;
     const aspect = ph.aspect ?? 1;
 
     let widthFrac: number;
-    if (aspect >= 1.2)           widthFrac = isEdge ? 0.10 : 0.17;
-    else if (aspect <= 0.5)      widthFrac = isEdge ? 0.065 : 0.095;
-    else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.11;
-    else                         widthFrac = isEdge ? 0.075 : 0.105;
+    if (numCols === 2) {
+      if (aspect >= 1.2)           widthFrac = 0.44;
+      else if (aspect <= 0.5)      widthFrac = 0.34;
+      else if (aspect <= 0.7)      widthFrac = 0.38;
+      else                         widthFrac = 0.40;
+    } else if (numCols === 3) {
+      if (aspect >= 1.2)           widthFrac = 0.28;
+      else if (aspect <= 0.5)      widthFrac = 0.20;
+      else if (aspect <= 0.7)      widthFrac = 0.23;
+      else                         widthFrac = 0.25;
+    } else {
+      if (aspect >= 1.2)           widthFrac = isEdge ? 0.10 : 0.17;
+      else if (aspect <= 0.5)      widthFrac = isEdge ? 0.065 : 0.095;
+      else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.11;
+      else                         widthFrac = isEdge ? 0.075 : 0.105;
+    }
 
-    // Approximate height in VH on standard desktop viewports
-    const heightVH = Math.min(38, (widthFrac / aspect) * 100 * (16 / 9));
+    const heightVH = Math.min(
+      numCols === 2 ? 46 : 38,
+      (widthFrac / aspect) * aspectScale
+    );
     const jH = (rng() * 2 - 1) * (JITTER_H / 100);
 
     const cyVH = colBottoms[col] + heightVH / 2;
@@ -162,23 +204,25 @@ function buildLayout(): PlacedPhoto[] {
     placed.push({
       ...ph,
       index: photoIdx,
-      cxFrac: COL_X[col] + jH,
+      cxFrac: colX[col] + (numCols === 2 ? jH * 0.3 : jH),
       cyVH,
       heightVH,
       widthFrac,
     });
 
     // Advance this column's bottom position with guaranteed breathing space
-    colBottoms[col] = bottomVH + GAP_VH;
+    colBottoms[col] = bottomVH + gapVH;
   });
 
-  return placed;
+  const totalVH = Math.max(...placed.map(p => p.cyVH + p.heightVH / 2)) + 30;
+  return { placed, totalVH };
 }
 
-const LAYOUT = buildLayout();
-// Gallery height ensures all 5 columns finish together with comfortable breathing room before the About section
-export const GALLERY_TOTAL_VH =
-  Math.max(...LAYOUT.map(p => p.cyVH + p.heightVH / 2)) + 30;
+const DESKTOP_DATA = buildLayout(5);
+const TABLET_DATA  = buildLayout(3);
+const MOBILE_DATA  = buildLayout(2);
+
+export const GALLERY_TOTAL_VH = DESKTOP_DATA.totalVH;
 
 interface GalleryProps {
   introComplete: boolean;
@@ -187,6 +231,26 @@ interface GalleryProps {
 
 export default function Gallery({ introComplete, onSelectPhoto }: GalleryProps) {
   const photoRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [layoutMode, setLayoutMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+
+  // Detect viewport size and dynamically select layout
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      const nextMode = w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop';
+      setLayoutMode((prev) => (prev !== nextMode ? nextMode : prev));
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const activeData =
+    layoutMode === 'mobile'
+      ? MOBILE_DATA
+      : layoutMode === 'tablet'
+      ? TABLET_DATA
+      : DESKTOP_DATA;
 
   // Scroll-reveal: smooth fade-in and subtle lift as each photo enters the viewport
   useEffect(() => {
@@ -210,7 +274,7 @@ export default function Gallery({ introComplete, onSelectPhoto }: GalleryProps) 
     });
 
     return () => obs.disconnect();
-  }, [introComplete]);
+  }, [introComplete, layoutMode]);
 
   return (
     <div
@@ -219,15 +283,18 @@ export default function Gallery({ introComplete, onSelectPhoto }: GalleryProps) 
       style={{
         position: 'relative',
         width:    '100%',
-        height:   `${GALLERY_TOTAL_VH}vh`,
+        height:   `${activeData.totalVH}vh`,
       }}
     >
-      {LAYOUT.map((item, i) => {
-        const wPct   = item.widthFrac * 100;
+      {activeData.placed.map((item, i) => {
+        const wPct    = item.widthFrac * 100;
         const leftPct = item.cxFrac * 100 - wPct / 2;
+        const maxW    = layoutMode === 'mobile' ? '46vw' : layoutMode === 'tablet' ? '30vw' : '22vw';
+        const maxH    = layoutMode === 'mobile' ? '48vh' : '40vh';
+
         return (
           <div
-            key={item.index}
+            key={`${layoutMode}-${item.index}`}
             ref={el => { photoRefs.current[i] = el; }}
             className="photo-wrap"
             onClick={() => onSelectPhoto(item.index)}
@@ -238,8 +305,8 @@ export default function Gallery({ introComplete, onSelectPhoto }: GalleryProps) 
               left:        `${leftPct}vw`,
               width:       `${wPct}vw`,
               aspectRatio: String(item.aspect),
-              maxHeight:   '40vh',
-              maxWidth:    '22vw',
+              maxHeight:   maxH,
+              maxWidth:    maxW,
               zIndex:      2,
               transform:   'translateY(-50%)',
               opacity:     0,
@@ -251,6 +318,7 @@ export default function Gallery({ introComplete, onSelectPhoto }: GalleryProps) 
               src={item.src}
               alt={item.title ?? 'Photograph'}
               loading="lazy"
+              decoding="async"
               style={{
                 width: '100%', height: '100%',
                 objectFit: 'cover', display: 'block',

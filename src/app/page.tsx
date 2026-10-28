@@ -84,12 +84,17 @@ export default function Home() {
     const cx = vw / 2;
     const cy = vh / 2;
 
+    const isMobile = vw < 640;
+    const isTablet = vw >= 640 && vw < 1024;
+    const scaleFactor = isMobile ? 2.1 : isTablet ? 1.35 : 1.0;
+    const pad = isMobile ? 14 : 20;
+
     type GridPos = { widthPx: number; heightPx: number; topPx: number; leftPx: number };
     const gridPos: GridPos[] = BURST_PHOTOS.map((bp) => {
-      const widthPx  = bp.w * vw;
+      const widthPx  = Math.min(vw * 0.42, bp.w * vw * scaleFactor);
       const heightPx = widthPx / bp.aspect;
-      const leftPx   = Math.max(12, Math.min(vw - widthPx - 12, bp.cx * vw - widthPx / 2));
-      const topPx    = Math.max(12, Math.min(vh - heightPx - 12, bp.cy * vh - heightPx / 2));
+      const leftPx   = Math.max(pad, Math.min(vw - widthPx - pad, bp.cx * vw - widthPx / 2));
+      const topPx    = Math.max(pad, Math.min(vh - heightPx - pad, bp.cy * vh - heightPx / 2));
       return { widthPx, heightPx, leftPx, topPx };
     });
 
@@ -226,7 +231,8 @@ export default function Home() {
     const lenis = new Lenis({
       duration: 1.2,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      touchMultiplier: 1.5,
+      touchMultiplier: 1.0,
+      syncTouch: true,
     });
     lenisRef.current = lenis;
 
@@ -400,7 +406,7 @@ export default function Home() {
           <h1 style={{
             fontFamily: 'var(--font-norman)',
             fontVariationSettings: "'wght' 400",
-            fontSize:   'clamp(3.2rem, 7.8vw, 7.2rem)',
+            fontSize:   'clamp(1.9rem, 8.5vw, 6.5rem)',
             fontWeight: 400,
             letterSpacing: '-0.02em',
             lineHeight: 0.95,

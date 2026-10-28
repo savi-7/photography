@@ -318,6 +318,7 @@ body::before {
   position: relative;
   width: 100%;
   height: 100vh;
+  height: 100svh;
   overflow: hidden;
   background: var(--bg);
   z-index: 20;
@@ -747,6 +748,7 @@ body::before {
 @media (max-width: 900px) {
   .nav {
     padding: 1rem 1.5rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
   }
   .nav__links {
     gap: 1.4rem;
@@ -803,7 +805,67 @@ body::before {
     font-size: 1rem;
   }
   .lightbox-nav-btn {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav {
+    padding: 0.85rem 1.25rem;
+    padding-top: max(0.85rem, env(safe-area-inset-top));
+  }
+  .nav__logo {
+    font-size: 1.1rem;
+    padding: 0.25rem 0.5rem 0.25rem 0;
+  }
+  .nav__links {
+    gap: 1.1rem;
+  }
+  .nav__link {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.2rem;
+  }
+  .about-intro-content {
+    padding: max(3.8rem, env(safe-area-inset-top) + 2rem) 1.2rem 1.2rem;
+    gap: 1rem;
+  }
+  .about-portrait-wrap {
+    width: clamp(170px, 46vw, 210px);
+    height: auto;
+    aspect-ratio: 4 / 5;
+  }
+  .about-bio-wrap {
+    gap: 0.6rem;
+    max-width: 95%;
+  }
+  .about-bio-p {
+    font-size: clamp(14px, 3.8vw, 17px) !important;
+    line-height: 1.4;
+  }
+  .about-stack-card {
+    width: 78vw !important;
+    aspect-ratio: 400 / 540;
+  }
+  .about-giant-title {
+    font-size: 20vw !important;
+    left: 4vw;
+    bottom: 0.05em;
+  }
+  .about-caption {
+    left: 4vw;
+    top: 18%;
+    font-size: 0.62rem;
+  }
+  .lightbox-overlay {
+    padding: max(1rem, env(safe-area-inset-top)) 0.75rem max(1rem, env(safe-area-inset-bottom));
+  }
+  .lightbox-img {
+    max-width: 92vw;
+    max-height: 68vh;
+  }
+  .lightbox-nav-btn {
+    width: 40px;
+    height: 40px;
   }
 }
