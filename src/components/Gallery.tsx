@@ -128,48 +128,55 @@ interface PlacedPhoto extends LightboxPhoto {
 
 function buildLayout(): PlacedPhoto[] {
   const rng = mulberry32(42);
-  const columns: number[][] = [[], [], [], [], []];
-  SCROLL_PHOTOS.forEach((_, i) => columns[i % 5].push(i));
   const placed: PlacedPhoto[] = [];
+  const colBottoms = COL_Y0.map(y0 => SCROLL_START_VH + y0);
 
-  columns.forEach((colPhotos, col) => {
-    let currentY = SCROLL_START_VH + COL_Y0[col];
+  SCROLL_PHOTOS.forEach((ph, photoIdx) => {
+    // Pick the column with the minimum bottom height so all 5 columns remain evenly populated
+    let minCol = 0;
+    let minBottom = colBottoms[0];
+    for (let c = 1; c < 5; c++) {
+      if (colBottoms[c] < minBottom) {
+        minBottom = colBottoms[c];
+        minCol = c;
+      }
+    }
+
+    const col = minCol;
     const isEdge = col === 0 || col === 4;
+    const aspect = ph.aspect ?? 1;
 
-    colPhotos.forEach((photoIdx, row) => {
-      const ph = SCROLL_PHOTOS[photoIdx];
-      const jH = (rng() * 2 - 1) * (JITTER_H / 100);
-      const aspect = ph.aspect ?? 1;
+    let widthFrac: number;
+    if (aspect >= 1.2)           widthFrac = isEdge ? 0.10 : 0.17;
+    else if (aspect <= 0.5)      widthFrac = isEdge ? 0.065 : 0.095;
+    else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.11;
+    else                         widthFrac = isEdge ? 0.075 : 0.105;
 
-      let widthFrac: number;
-      if (aspect >= 1.2)           widthFrac = isEdge ? 0.10 : 0.17;
-      else if (aspect <= 0.5)      widthFrac = isEdge ? 0.065 : 0.095;
-      else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.11;
-      else                         widthFrac = isEdge ? 0.075 : 0.105;
+    // Approximate height in VH on standard desktop viewports
+    const heightVH = Math.min(38, (widthFrac / aspect) * 100 * (16 / 9));
+    const jH = (rng() * 2 - 1) * (JITTER_H / 100);
 
-      // Calculate approximate height in VH across standard desktop (16:9 ratio)
-      const heightVH = Math.min(38, (widthFrac / aspect) * 100 * (16 / 9));
-      const cyVH = currentY + heightVH / 2;
+    const cyVH = colBottoms[col] + heightVH / 2;
+    const bottomVH = cyVH + heightVH / 2;
 
-      placed.push({
-        ...ph,
-        index: photoIdx,
-        cxFrac: COL_X[col] + jH,
-        cyVH,
-        heightVH,
-        widthFrac,
-      });
-
-      // Advance currentY for the next photo in this column with guaranteed gap
-      currentY = cyVH + heightVH / 2 + GAP_VH;
+    placed.push({
+      ...ph,
+      index: photoIdx,
+      cxFrac: COL_X[col] + jH,
+      cyVH,
+      heightVH,
+      widthFrac,
     });
+
+    // Advance this column's bottom position with guaranteed breathing space
+    colBottoms[col] = bottomVH + GAP_VH;
   });
 
   return placed;
 }
 
 const LAYOUT = buildLayout();
-// Gallery height ensures all photos display with comfortable breathing space before the About section
+// Gallery height ensures all 5 columns finish together with comfortable breathing room before the About section
 export const GALLERY_TOTAL_VH =
   Math.max(...LAYOUT.map(p => p.cyVH + p.heightVH / 2)) + 30;
 
