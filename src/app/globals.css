@@ -338,9 +338,9 @@ body::before {
 
 .about-portrait-wrap {
   position: relative;
-  width: 176px;
+  width: 311px;
+  height: 389px;
   aspect-ratio: 4 / 5;
-  height: auto;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   flex-shrink: 0;
@@ -756,9 +756,9 @@ body::before {
     gap: 1.25rem;
   }
   .about-portrait-wrap {
-    width: 136px;
+    width: 220px;
+    height: 275px;
     aspect-ratio: 4 / 5;
-    height: auto;
   }
   .about-bio-wrap {
     gap: 0.9rem;

@@ -257,12 +257,27 @@ export default function Home() {
         else             nav.classList.remove('nav--visible');
       }
 
-      // Plus crosshair and hero title fade out on initial scroll into gallery
-      const fadeStart = vh * 0.12;
-      const fadeEnd   = vh * 0.42;
-      const progress  = Math.max(0, Math.min(1, (scroll - fadeStart) / (fadeEnd - fadeStart)));
-      if (plus) plus.style.opacity = String(1 - progress);
-      if (title) title.style.opacity = String(1 - progress);
+      // Plus crosshair fades out on initial scroll into gallery
+      const plusFadeStart = vh * 0.12;
+      const plusFadeEnd   = vh * 0.42;
+      const plusProgress  = Math.max(0, Math.min(1, (scroll - plusFadeStart) / (plusFadeEnd - plusFadeStart)));
+      if (plus) plus.style.opacity = String(1 - plusProgress);
+
+      // Hero name stays visible while scrolling through gallery, fading away only when arriving at the About section
+      if (title) {
+        const aboutEl = document.getElementById('about');
+        if (aboutEl) {
+          const rect = aboutEl.getBoundingClientRect();
+          if (rect.top < vh) {
+            const aboutProgress = Math.max(0, Math.min(1, (vh - rect.top) / (vh * 0.6)));
+            title.style.opacity = String(1 - aboutProgress);
+          } else {
+            title.style.opacity = '1';
+          }
+        } else {
+          title.style.opacity = '1';
+        }
+      }
     };
 
     lenis.on('scroll', onScroll);
