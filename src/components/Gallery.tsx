@@ -103,7 +103,7 @@ export const SCROLL_PHOTOS: LightboxPhoto[] = [
   { src: "/assets/Terreo Studio Develops a Classical Yet Contemporary Residential Complex in Tulum, Mexico - Interior Design.jpg", aspect: 2/3, title: "Tulum Contemporary Form" },
   { src: "/assets/art-of-minimalism.jpg", aspect: 4/5, title: "Art of Minimalism" },
   { src: "/assets/kadal-living-sea.jpg", aspect: 9/16, title: "Kadal — The Living Sea" },
-  { src: "/assets/cool-reflections.jpg", aspect: 4/3, title: "Cool Reflections" },
+  { src: "/assets/cool-reflections.jpg", aspect: 3/4, title: "Cool Reflections" },
   { src: "/assets/breeze-green.jpg", aspect: 9/16, title: "Breeze on Green" },
   { src: "/assets/405324035234449553.jpg", aspect: 9/16, title: "Mediterranean Facade" },
   { src: "/assets/679762137514905982.jpg", aspect: 9/16, title: "Glimmering Shallows" },
@@ -113,17 +113,16 @@ export const SCROLL_PHOTOS: LightboxPhoto[] = [
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 const COL_X           = [0.06, 0.28, 0.50, 0.72, 0.94];
-const COL_Y0          = [4,    16,   6,    20,   10  ];
-const SPACING_VH      = 48;
-const JITTER_V        = 3;
+const COL_Y0          = [4,    20,   8,    24,   12  ];
+const GAP_VH          = 22;    // guaranteed breathing space between photos in same column
 const JITTER_H        = 1.0;
-const SCROLL_START_VH = 8;     // gallery starts seamlessly right below the hero
-const TRAIL_VH        = 35;    // breathing room after the last photo
+const SCROLL_START_VH = 8;     // gallery starts right below the hero
 
 interface PlacedPhoto extends LightboxPhoto {
   index: number;
   cxFrac: number;
   cyVH: number;
+  heightVH: number;
   widthFrac: number;
 }
 
@@ -134,26 +133,35 @@ function buildLayout(): PlacedPhoto[] {
   const placed: PlacedPhoto[] = [];
 
   columns.forEach((colPhotos, col) => {
+    let currentY = SCROLL_START_VH + COL_Y0[col];
+    const isEdge = col === 0 || col === 4;
+
     colPhotos.forEach((photoIdx, row) => {
       const ph = SCROLL_PHOTOS[photoIdx];
-      const jV = (rng() * 2 - 1) * JITTER_V;
       const jH = (rng() * 2 - 1) * (JITTER_H / 100);
-      const isEdge = col === 0 || col === 4;
-      let widthFrac: number;
       const aspect = ph.aspect ?? 1;
 
-      if (aspect >= 1.2)           widthFrac = isEdge ? 0.10 : 0.18;
+      let widthFrac: number;
+      if (aspect >= 1.2)           widthFrac = isEdge ? 0.10 : 0.17;
       else if (aspect <= 0.5)      widthFrac = isEdge ? 0.065 : 0.095;
-      else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.115;
-      else                         widthFrac = isEdge ? 0.075 : 0.11;
+      else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.11;
+      else                         widthFrac = isEdge ? 0.075 : 0.105;
+
+      // Calculate approximate height in VH across standard desktop (16:9 ratio)
+      const heightVH = Math.min(38, (widthFrac / aspect) * 100 * (16 / 9));
+      const cyVH = currentY + heightVH / 2;
 
       placed.push({
         ...ph,
         index: photoIdx,
         cxFrac: COL_X[col] + jH,
-        cyVH: SCROLL_START_VH + COL_Y0[col] + row * SPACING_VH + jV,
+        cyVH,
+        heightVH,
         widthFrac,
       });
+
+      // Advance currentY for the next photo in this column with guaranteed gap
+      currentY = cyVH + heightVH / 2 + GAP_VH;
     });
   });
 
@@ -161,10 +169,9 @@ function buildLayout(): PlacedPhoto[] {
 }
 
 const LAYOUT = buildLayout();
-// Gallery height ensures the lowest row of photos displays completely without clipping,
-// transitioning directly into the About section without unnecessary gap.
+// Gallery height ensures all photos display with comfortable breathing space before the About section
 export const GALLERY_TOTAL_VH =
-  Math.max(...LAYOUT.map(p => p.cyVH)) + 14;
+  Math.max(...LAYOUT.map(p => p.cyVH + p.heightVH / 2)) + 30;
 
 interface GalleryProps {
   introComplete: boolean;
