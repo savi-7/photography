@@ -307,60 +307,143 @@ body::before {
   backface-visibility: hidden;
 }
 
-/* ── About Section ─────────────────────────────────────────────── */
-.about {
+/* ── About Section (Pinned Stage Scroll Sequence) ─────────────── */
+.about-pinned-section {
   position: relative;
-  z-index: 10;
-  background: var(--bg);
   width: 100%;
-  padding: 10rem 4rem 8rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5rem;
-  align-items: center;
-  max-width: 1400px;
-  margin: 0 auto;
+  background: var(--bg);
 }
 
-.about__quote {
-  font-family: var(--font-display);
-  font-size: clamp(2.5rem, 4.5vw, 4.2rem);
-  font-weight: 400;
-  font-style: italic;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  color: var(--ink);
+.about-stage {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  z-index: 20;
 }
 
-.about__text {
+.about-intro-content {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.8rem;
+  align-items: center;
+  justify-content: center;
+  padding: 4.5rem 2rem 2rem;
+  z-index: 7;
+  pointer-events: none;
+  gap: 1.75rem;
 }
 
-.about__body {
-  font-family: var(--font-body);
-  font-size: 0.95rem;
-  font-weight: 300;
-  line-height: 1.85;
-  color: var(--dust);
-  max-width: 480px;
+.about-portrait-wrap {
+  position: relative;
+  width: 210px;
+  height: 160px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+  will-change: transform, opacity;
 }
 
-.about__stats {
+.about-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(100%);
+  display: block;
+}
+
+.about-bio-wrap {
+  width: 90%;
+  max-width: 750px;
+  text-align: center;
   display: flex;
-  gap: 3.5rem;
-  margin-top: 1rem;
-  padding-top: 2rem;
-  border-top: 1px solid rgba(13, 13, 13, 0.08);
+  flex-direction: column;
+  gap: 1.25rem;
+  will-change: opacity;
 }
 
-.about__stat-num {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-style: italic;
-  color: var(--ink);
-  line-height: 1;
+.about-bio-p {
+  font-family: var(--font-body);
+  font-size: clamp(18px, 1.75vw, 26px);
+  font-weight: 400;
+  line-height: 1.4;
+  color: #22201e;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.about-stack-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.about-stack-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(350px, 25vw, 420px);
+  aspect-ratio: 400 / 560;
+  overflow: hidden;
+  border-radius: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08), 0 20px 48px rgba(0, 0, 0, 0.18);
+  will-change: transform;
+  pointer-events: auto;
+}
+
+.about-stack-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.about-title-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.about-giant-title {
+  position: absolute;
+  bottom: -0.05em;
+  left: 2vw;
+  font-family: var(--font-body), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: clamp(6rem, 20vw, 22vw);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.8;
+  text-transform: uppercase;
+  color: #0d0d0d;
+  z-index: 5;
+  pointer-events: none;
+  white-space: nowrap;
+  user-select: none;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.about-caption {
+  position: absolute;
+  left: 2.2vw;
+  top: calc(50% - 10px);
+  font-family: var(--font-body);
+  font-size: clamp(0.6rem, 0.72vw, 0.75rem);
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dust, #7A7570);
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
 /* ── Marquee ───────────────────────────────────────────────────── */
@@ -667,13 +750,35 @@ body::before {
   .nav__links {
     gap: 1.4rem;
   }
-  .about {
-    grid-template-columns: 1fr;
-    gap: 3.5rem;
-    padding: 7rem 1.5rem 5rem;
+  .about-intro-content {
+    padding: 4.5rem 1.25rem 1.5rem;
+    gap: 1.25rem;
   }
-  .about__stats {
-    gap: 2rem;
+  .about-portrait-wrap {
+    width: 160px;
+    height: 125px;
+  }
+  .about-bio-wrap {
+    gap: 0.9rem;
+    max-width: 92%;
+  }
+  .about-bio-p {
+    font-size: 18px !important;
+    line-height: 1.45;
+  }
+  .about-stack-card {
+    width: 70vw !important;
+    aspect-ratio: 400 / 540;
+  }
+  .about-giant-title {
+    font-size: 24vw !important;
+    left: 3vw;
+    bottom: 0.05em;
+  }
+  .about-caption {
+    left: 4vw;
+    top: 22%;
+    font-size: 0.65rem;
   }
   .footer {
     flex-direction: column;

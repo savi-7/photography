@@ -2,10 +2,14 @@
 
 import { useLayoutEffect, useEffect, useRef, useState, useCallback } from 'react';
 import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import Cursor from '@/components/Cursor';
 import Gallery, { SCROLL_PHOTOS } from '@/components/Gallery';
 import Lightbox, { LightboxPhoto } from '@/components/Lightbox';
+import AboutSection from '@/components/AboutSection';
+
+gsap.registerPlugin(ScrollTrigger);
 
 // ─── Pile offsets ────────────────────────────────────────────────────────────
 const PILE_OFFSETS = [
@@ -20,13 +24,13 @@ const PILE_OFFSETS = [
 const BURST_PHOTOS: (LightboxPhoto & { cx: number; cy: number; w: number; aspect: number })[] = [
   { src: '/assets/moody green.jpg',         aspect: 4/3, cx: 0.08, cy: 0.14, w: 0.11, title: 'Moody Canopy' },
   { src: '/assets/aesthetic.jpg',           aspect: 3/4, cx: 0.28, cy: 0.22, w: 0.12, title: 'Pocket Wildflowers' },
-  { src: '/assets/travel (1).jpg',          aspect: 2/3, cx: 0.73, cy: 0.36, w: 0.12, title: 'Misty Trail' },
-  { src: '/assets/download (10).jpg',       aspect: 4/3, cx: 0.90, cy: 0.18, w: 0.12, title: 'Coastal Plain' },
+  { src: '/assets/travel (1).jpg',          aspect: 2/3, cx: 0.74, cy: 0.30, w: 0.11, title: 'Misty Trail' },
+  { src: '/assets/download (10).jpg',       aspect: 4/3, cx: 0.91, cy: 0.26, w: 0.11, title: 'Coastal Plain' },
   { src: '/assets/download (2).jpg',        aspect: 2/3, cx: 0.27, cy: 0.72, w: 0.12, title: 'Sunlit Sunroof' },
   { src: '/assets/cafe.jpg',                aspect: 4/3, cx: 0.73, cy: 0.68, w: 0.17, title: 'Quiet Conservatory' },
   { src: '/assets/architecture.jpg',        aspect: 4/3, cx: 0.08, cy: 0.62, w: 0.10, title: 'Bougainvillea Villa' },
   { src: '/assets/travel.jpg',              aspect: 2/3, cx: 0.50, cy: 0.76, w: 0.11, title: 'Highland Meadow' },
-  { src: '/assets/Beach.jpg',               aspect: 4/3, cx: 0.85, cy: 0.10, w: 0.09, title: 'Coastal Dusk' },
+  { src: '/assets/Beach.jpg',               aspect: 4/3, cx: 0.87, cy: 0.08, w: 0.09, title: 'Coastal Dusk' },
   { src: '/assets/friends.jpg',             aspect: 2/3, cx: 0.50, cy: 0.20, w: 0.11, title: 'Circle of Friends' },
   { src: '/assets/travel_train_travel.jpg', aspect: 4/3, cx: 0.08, cy: 0.86, w: 0.12, title: 'Train Threshold' },
 ];
@@ -226,12 +230,19 @@ export default function Home() {
     });
     lenisRef.current = lenis;
 
-    let rafId: number;
-    function raf(time: number) {
-      lenis.raf(time);
-      rafId = requestAnimationFrame(raf);
-    }
-    rafId = requestAnimationFrame(raf);
+    // Sync Lenis with GSAP ScrollTrigger
+    lenis.on('scroll', ScrollTrigger.update);
+
+    const updateTicker = (time: number) => {
+      lenis.raf(time * 1000);
+    };
+    gsap.ticker.add(updateTicker);
+    gsap.ticker.lagSmoothing(0);
+
+    // Initial refresh after intro finishes
+    setTimeout(() => {
+      ScrollTrigger.refresh();
+    }, 100);
 
     // Scroll listener for nav reveal and title / plus fade
     const onScroll = () => {
@@ -246,33 +257,20 @@ export default function Home() {
         else             nav.classList.remove('nav--visible');
       }
 
-      // Plus crosshair fades out on initial scroll
-      const fadeStart = vh * 0.15;
-      const fadeEnd   = vh * 0.45;
+      // Plus crosshair and hero title fade out on initial scroll into gallery
+      const fadeStart = vh * 0.12;
+      const fadeEnd   = vh * 0.42;
       const progress  = Math.max(0, Math.min(1, (scroll - fadeStart) / (fadeEnd - fadeStart)));
       if (plus) plus.style.opacity = String(1 - progress);
-
-      // Hero name stays visible throughout gallery scroll, only fading out when arriving at the About section
-      if (title) {
-        const aboutEl = document.getElementById('about');
-        if (aboutEl) {
-          const rect = aboutEl.getBoundingClientRect();
-          if (rect.top < vh) {
-            const aboutFade = Math.max(0, Math.min(1, (vh - rect.top) / (vh * 0.4)));
-            title.style.opacity = String(1 - aboutFade);
-          } else {
-            title.style.opacity = '1';
-          }
-        } else {
-          title.style.opacity = '1';
-        }
-      }
+      if (title) title.style.opacity = String(1 - progress);
     };
 
     lenis.on('scroll', onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
-      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', onScroll);
+      gsap.ticker.remove(updateTicker);
       lenis.destroy();
       lenisRef.current = null;
     };
@@ -444,103 +442,9 @@ export default function Home() {
         <Gallery introComplete={introComplete} onSelectPhoto={openScrollLightbox} />
 
         {/* ══════════════════════════════════════════════════════
-             ABOUT SECTION
+             ABOUT SECTION (Pinned Stage Scroll Sequence)
            ══════════════════════════════════════════════════════ */}
-        <section id="about" className="about">
-          <div>
-            <p className="t-label" style={{ marginBottom: '2rem' }}>About the Photographer</p>
-            <h2 className="about__quote">
-              Light is the<br />
-              <em>language</em> I speak<br />
-              most fluently.
-            </h2>
-          </div>
-
-          <div className="about__text">
-            <p className="t-label">Savio Joseph · Kerala, India</p>
-            <p className="about__body">
-              I am an aesthetic, minimalistic photographer drawn to the quiet moments
-              between things — the way sunlight falls through a window, the stillness
-              of a cafe in the early morning, the texture of leaves against open sky.
-            </p>
-            <p className="about__body">
-              My work is an invitation to slow down, to look closer, and to find
-              beauty in the ordinary. Every frame is intentional; every shadow, deliberate.
-            </p>
-
-            {/* Stats row */}
-            <div className="about__stats">
-              {[['5+','Years'], ['200+','Images'], ['∞','Stories']].map(([n, l]) => (
-                <div key={l}>
-                  <div className="about__stat-num">{n}</div>
-                  <div className="t-label" style={{ marginTop:'0.3rem' }}>{l}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════════════════════
-             MARQUEE
-           ══════════════════════════════════════════════════════ */}
-        <div className="marquee-wrap" aria-hidden="true">
-          <div className="marquee-track">
-            {[...Array(2)].map((_, rep) => (
-              <div key={rep} style={{ display:'flex', gap:'4rem', alignItems:'center' }}>
-                {['Aesthetic','Minimal','Moody','Timeless','Analog','Still Life','Kerala','Nature','Architecture','Cafe Culture'].map((word, wi) => (
-                  <span key={wi} style={{ display:'flex', alignItems:'center', gap:'4rem' }}>
-                    <span className="marquee-item">{word}</span>
-                    <span className="marquee-item marquee-dot">·</span>
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ══════════════════════════════════════════════════════
-             FOOTER
-           ══════════════════════════════════════════════════════ */}
-        <footer className="footer">
-          <div
-            className="footer__name"
-            aria-hidden="true"
-            style={{
-              fontFamily: 'var(--font-norman)',
-              fontVariationSettings: "'wght' 400",
-            }}
-          >
-            Savio Joseph
-          </div>
-          <div className="footer__right">
-            <div className="footer__links">
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noreferrer"
-                className="footer__link"
-              >
-                Instagram
-              </a>
-              <a
-                href="mailto:saviojoseph@email.com"
-                className="footer__link"
-              >
-                Email
-              </a>
-              <button
-                type="button"
-                onClick={() => scrollToTarget(0)}
-                className="footer__link"
-              >
-                ↑ Back to top
-              </button>
-            </div>
-            <p className="footer__copy">
-              © {new Date().getFullYear()} Savio Joseph · All rights reserved
-            </p>
-          </div>
-        </footer>
+        <AboutSection introComplete={introComplete} />
 
       </div>{/* end containerRef */}
     </>

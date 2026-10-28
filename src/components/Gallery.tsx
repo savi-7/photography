@@ -72,12 +72,49 @@ export const SCROLL_PHOTOS: LightboxPhoto[] = [
   { src: '/assets/clouds-landscape.jpg',       aspect: 2/3,  title: 'Dramatic Sky' },
   { src: '/assets/cafe-arch.jpg',              aspect: 3/4,  title: 'Arched Alcove' },
   { src: '/assets/The best rustic style decoration ideas from Greek hotels -The Hotel Trotter.jpg', aspect: 3/4, title: 'Rustic Greek Hotel Arch' },
+  { src: "/assets/Maldives.jpg", aspect: 2/3, title: "Maldives Horizon" },
+  { src: "/assets/maldives beach.jpg", aspect: 4/3, title: "Azure Coastline" },
+  { src: "/assets/maldives vibe.jpg", aspect: 4/3, title: "Island Reverie" },
+  { src: "/assets/sunset-maldives.jpg", aspect: 9/16, title: "Maldivian Sunset" },
+  { src: "/assets/Varkala cliff_.jpg", aspect: 4/3, title: "Varkala Cliffs" },
+  { src: "/assets/Panjim, Goa_.jpg", aspect: 3/4, title: "Panjim Latin Quarter" },
+  { src: "/assets/The cape Goa.jpg", aspect: 9/16, title: "Cape Horizons" },
+  { src: "/assets/LIFESTYLE SUMMER (I)_ BEACH DAYS IN ALTEA AND WE VISIT THE GOA RESTAURANT - By Littlefew_com.jpg", aspect: 2/3, title: "Summer Days in Altea" },
+  { src: "/assets/mattupetty-dam.jpg", aspect: 5/7, title: "Mattupetty Waters" },
+  { src: "/assets/Meeshapulimala.jpg", aspect: 9/16, title: "Meeshapulimala Ridge" },
+  { src: "/assets/munnar-tea-slopes.jpg", aspect: 9/16, title: "Munnar Tea Slopes" },
+  { src: "/assets/Nilgiris_.jpg", aspect: 9/16, title: "Nilgiri Blue Mountains" },
+  { src: "/assets/pine-munnar-forest.jpg", aspect: 4/3, title: "Vattavada Pine Forest" },
+  { src: "/assets/pine valley.jpg", aspect: 9/16, title: "Pine Valley Mist" },
+  { src: "/assets/ocean.jpg", aspect: 9/16, title: "Infinite Ocean" },
+  { src: "/assets/WOAA.jpg", aspect: 3/5, title: "Coastal Solitude" },
+  { src: "/assets/1105070827324360056.jpg", aspect: 9/16, title: "Golden Reflections" },
+  { src: "/assets/1112881757894108259.jpg", aspect: 4/3, title: "Terracotta & Light" },
+  { src: "/assets/25614291625184000.jpg", aspect: 9/20, title: "Highland Trail" },
+  { src: "/assets/358176976662685710.jpg", aspect: 9/16, title: "Quiet Greenery" },
+  { src: "/assets/634796510024120191.jpg", aspect: 9/16, title: "Breezy Balcony" },
+  { src: "/assets/701576448234893889.jpg", aspect: 9/16, title: "Sunlit Veranda" },
+  { src: "/assets/804244446002392491.jpg", aspect: 4/3, title: "Warm Architecture" },
+  { src: "/assets/826480969127863008.jpg", aspect: 9/16, title: "Subtle Textures" },
+  { src: "/assets/946600415442202616.jpg", aspect: 9/16, title: "Dusk Atmosphere" },
+  { src: "/assets/cafe aesthetics.jpg", aspect: 4/3, title: "Warm Corner Cafe" },
+  { src: "/assets/kirsten-interior.jpg", aspect: 5/8, title: "Sunlit Interior" },
+  { src: "/assets/harvest-coffee.jpg", aspect: 9/16, title: "Summer Coffee Harvest" },
+  { src: "/assets/Terreo Studio Develops a Classical Yet Contemporary Residential Complex in Tulum, Mexico - Interior Design.jpg", aspect: 2/3, title: "Tulum Contemporary Form" },
+  { src: "/assets/art-of-minimalism.jpg", aspect: 4/5, title: "Art of Minimalism" },
+  { src: "/assets/kadal-living-sea.jpg", aspect: 9/16, title: "Kadal — The Living Sea" },
+  { src: "/assets/cool-reflections.jpg", aspect: 4/3, title: "Cool Reflections" },
+  { src: "/assets/breeze-green.jpg", aspect: 9/16, title: "Breeze on Green" },
+  { src: "/assets/405324035234449553.jpg", aspect: 9/16, title: "Mediterranean Facade" },
+  { src: "/assets/679762137514905982.jpg", aspect: 9/16, title: "Glimmering Shallows" },
+  { src: "/assets/792070653257229854.jpg", aspect: 9/16, title: "Cliffside Canopy" },
+  { src: "/assets/Bea.jpg", aspect: 9/16, title: "Tide & Foam" },
 ];
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 const COL_X           = [0.06, 0.28, 0.50, 0.72, 0.94];
 const COL_Y0          = [4,    16,   6,    20,   10  ];
-const SPACING_VH      = 42;
+const SPACING_VH      = 48;
 const JITTER_V        = 3;
 const JITTER_H        = 1.0;
 const SCROLL_START_VH = 8;     // gallery starts seamlessly right below the hero
@@ -106,7 +143,8 @@ function buildLayout(): PlacedPhoto[] {
       const aspect = ph.aspect ?? 1;
 
       if (aspect >= 1.2)           widthFrac = isEdge ? 0.10 : 0.18;
-      else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.12;
+      else if (aspect <= 0.5)      widthFrac = isEdge ? 0.065 : 0.095;
+      else if (aspect <= 0.7)      widthFrac = isEdge ? 0.08 : 0.115;
       else                         widthFrac = isEdge ? 0.075 : 0.11;
 
       placed.push({
@@ -123,8 +161,10 @@ function buildLayout(): PlacedPhoto[] {
 }
 
 const LAYOUT = buildLayout();
+// Gallery height ensures the lowest row of photos displays completely without clipping,
+// transitioning directly into the About section without unnecessary gap.
 export const GALLERY_TOTAL_VH =
-  Math.max(...LAYOUT.map(p => p.cyVH)) + SPACING_VH / 2 + TRAIL_VH;
+  Math.max(...LAYOUT.map(p => p.cyVH)) + 14;
 
 interface GalleryProps {
   introComplete: boolean;
@@ -184,6 +224,8 @@ export default function Gallery({ introComplete, onSelectPhoto }: GalleryProps) 
               left:        `${leftPct}vw`,
               width:       `${wPct}vw`,
               aspectRatio: String(item.aspect),
+              maxHeight:   '40vh',
+              maxWidth:    '22vw',
               zIndex:      2,
               transform:   'translateY(-50%)',
               opacity:     0,
